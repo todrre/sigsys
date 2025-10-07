@@ -10,15 +10,17 @@ import control as ct
 
 # 2) 
 # Spec för A-A filter:
-fs = int(18e3) # Samplingsfrekvens
-fp = 8e3 # Passbandfrekvens
-fb = 9e3 # Stoppbandfrekvens
-mr = 3 # Max rippel
-md = np.abs(20*np.log10(2**-12)) # Min dämpning
-t = np.linspace(0, 1, fs)
+fs = 24e3 # Samplingsfrekvens (rad/s)
+fp = 8e3  # Passbandfrekvens (rad/s)
+fb = 9e3 # Stoppbandfrekvens (rad/s)
+mr = 3 # Max rippel (dB)
+md = np.abs(20*np.log10(2**-12)) # Min dämpning (dB)
+
+wp = fp * 2 * np.pi
+wb = fb * 2 * np.pi
 
 # 3)
-N, Wn = signal.cheb1ord(wp=2*np.pi * fp, ws=2 * np.pi * fb, gpass=mr, gstop=md, analog=True)
+N, Wn = signal.cheb1ord(wp=wp, ws=wb, gpass=mr, gstop=md, analog=True)
 print(N)
 b, a = signal.cheby1(N, mr, Wn, 'low', analog=True)
 LP_filter = signal.lti(b,a)
@@ -56,8 +58,46 @@ ax2.tick_params(axis='y', labelcolor='tab:red')
 plt.show()
 
 # 4)
-signal_och_brus = np.sin(2 * np.pi * 7e3 * t) + np.sin(2 * np.pi * 11e3 * t)
 
+t = np.linspace(0, 0.1, int(fs))
+u = np.sin(2 * np.pi * 7e3 * t) + np.sin(2 * np.pi * 20e3 * t)
 
-T_out, y_out = ct.forced_response(LP_filter, T=t, U=signal_och_brus)
+tout, yout, xout = signal.lsim(LP_filter, U=u, T=t)
 
+korrigerad_yout = yout * 10**(3/20)
+
+plt.plot(t, u, 'r', alpha=0.5, linewidth=1, label='input')
+plt.plot(tout, yout, 'k', linewidth=1.5, label='output')
+plt.plot(tout, korrigerad_yout, linestyle=':')
+plt.legend(loc='best', shadow=True, framealpha=1)
+plt.grid(alpha=0.3)
+plt.xlabel('t')
+plt.show()
+
+u_fft = np.fft.fft(u) # Fixade funktionen till np.fft.fft
+yout_fft = np.fft.fft(yout) # Fixade funktionen till np.fft.fft
+
+N = len(t) # Antal samplingar
+T = (t[-1] - t[0]) / fs # Samplingsperiod
+
+freq = np.fft.fftfreq(N, T)
+print(freq)
+half_N = N // 2
+freq_plot = freq[:half_N]
+
+u_magnitude = 2.0 / N * np.abs(u_fft[:half_N])
+yout_magnitude = 2.0 / N * np.abs(yout_fft[:half_N])
+
+# Plotta spektrumet
+plt.figure(figsize=(10, 5))
+plt.semilogx(freq_plot, u_magnitude, 'r', alpha=0.5, linewidth=1, label='Input Spektrum (u)')
+plt.semilogx(freq_plot, yout_magnitude, 'k', linewidth=1.5, label='Output Spektrum (yout)')
+
+plt.legend(loc='best', shadow=True, framealpha=1)
+plt.grid(alpha=0.3)
+plt.xlabel('Frekvens (kHz)')
+plt.ylabel('Magnitud')
+plt.title('Magnitudspektrum i frekvensdomän')
+plt.ylim(bottom=0)
+plt.xlim(left=6000, right=30000)
+plt.show()
