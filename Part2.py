@@ -6,13 +6,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as signal
-import control as ct
 
 # 2) 
 # Spec för A-A filter:
-fs = 24e3 # Samplingsfrekvens (rad/s)
+fs = 16e3 # Samplingsfrekvens (rad/s) Eftersom det är ett analogt så sker filtreringen innan samplingen 
 fp = 8e3  # Passbandfrekvens (rad/s)
-fb = 9e3 # Stoppbandfrekvens (rad/s)
+fb = 11e3 # Stoppbandfrekvens (rad/s)
 mr = 3 # Max rippel (dB)
 md = np.abs(20*np.log10(2**-12)) # Min dämpning (dB)
 
@@ -60,44 +59,43 @@ plt.show()
 # 4)
 
 t = np.linspace(0, 0.1, int(fs))
-u = np.sin(2 * np.pi * 7e3 * t) + np.sin(2 * np.pi * 20e3 * t)
+u = np.sin(2 * np.pi * 7e3 * t) + np.sin(2 * np.pi * 15e3 * t)
 
 tout, yout, xout = signal.lsim(LP_filter, U=u, T=t)
 
-korrigerad_yout = yout * 10**(3/20)
-
 plt.plot(t, u, 'r', alpha=0.5, linewidth=1, label='input')
 plt.plot(tout, yout, 'k', linewidth=1.5, label='output')
-plt.plot(tout, korrigerad_yout, linestyle=':')
 plt.legend(loc='best', shadow=True, framealpha=1)
 plt.grid(alpha=0.3)
 plt.xlabel('t')
 plt.show()
 
-u_fft = np.fft.fft(u) # Fixade funktionen till np.fft.fft
-yout_fft = np.fft.fft(yout) # Fixade funktionen till np.fft.fft
+# --- FFT-del ---
+N = len(t)
+yout_fft = np.fft.fft(yout, N)
 
-N = len(t) # Antal samplingar
-T = (t[-1] - t[0]) / fs # Samplingsperiod
+T = 1 / fs
+freq = np.linspace(0, fs, N//100, endpoint=False)/1000
 
-freq = np.fft.fftfreq(N, T)
-print(freq)
+# Ta endast den positiva halvan
 half_N = N // 2
-freq_plot = freq[:half_N]
+yout_magnitude = np.abs(yout_fft) / np.max(np.abs(freq))
 
-u_magnitude = 2.0 / N * np.abs(u_fft[:half_N])
-yout_magnitude = 2.0 / N * np.abs(yout_fft[:half_N])
+# Subsampla var 100:e punkt för plot
+step = 100
+freq_plot = freq  # till kHz
+yout_magnitude_plot = yout_magnitude[::step]
 
-# Plotta spektrumet
+# --- Plotta spektrum ---
 plt.figure(figsize=(10, 5))
-plt.semilogx(freq_plot, u_magnitude, 'r', alpha=0.5, linewidth=1, label='Input Spektrum (u)')
-plt.semilogx(freq_plot, yout_magnitude, 'k', linewidth=1.5, label='Output Spektrum (yout)')
+# plt.stem(freq_plot, u_magnitude_plot, linefmt='r-', markerfmt='ro', basefmt=' ', label='Input Spektrum (u)')
+plt.stem(freq_plot, yout_magnitude_plot, linefmt='k-', markerfmt='ko', basefmt=' ', label='Output Spektrum (yout)')
 
 plt.legend(loc='best', shadow=True, framealpha=1)
 plt.grid(alpha=0.3)
 plt.xlabel('Frekvens (kHz)')
 plt.ylabel('Magnitud')
 plt.title('Magnitudspektrum i frekvensdomän')
+plt.xlim(0, fs/2 * 1e-3)  # bara positiva frekvenser upp till Nyquist
 plt.ylim(bottom=0)
-plt.xlim(left=6000, right=30000)
 plt.show()
